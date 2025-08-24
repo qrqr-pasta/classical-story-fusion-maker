@@ -34,7 +34,7 @@ def select_random_elements(story_data, num_elements):
     """ランダムに物語要素を選択する"""
     all_elements = []
     
-    # 全ての要素を一つのリストに集める
+    # 古い形式のJSONに対応（collection -> elements）
     for collection_name, elements in story_data.items():
         for element in elements:
             all_elements.append({
@@ -56,7 +56,7 @@ def create_prompt(selected_elements, word_count, custom_text=""):
         prompt = f"以下の物語の要素を包含して、ストーリーを作ってください。文字数は{word_count}文字前後です。最後に、出展にした物語の古典名と概略を載せてください\n\n"
         
         for i, element in enumerate(selected_elements, 1):
-            # 日本語をそのまま使用（Claudeは日本語を理解します）
+            # 古い形式のデータ構造
             collection = element['collection']
             story_name = element['story_name']
             element_text = element['element']
@@ -132,67 +132,38 @@ def extract_title_from_story(story):
     
     return title if title else "generated_story"
 
-def save_story_to_file(story, title=None):
-    """物語をファイルに保存"""
-    try:
-        # 題名が指定されていない場合は物語から自動抽出
-        if title is None:
-            title = extract_title_from_story(story)
-        
-        # ファイル名から問題のある文字をさらに厳格に除去
-        safe_title = ""
-        for char in title:
-            if char.isalnum() or char in "ーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽァィゥェォッャュョアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ一二三四五六七八九十百千万億兆":
-                safe_title += char
-            elif char in " 　":
-                safe_title += "_"
-            else:
-                safe_title += ""
-        
-        # 空の場合はデフォルト名を使用
-        if not safe_title.strip():
-            safe_title = "generated_story"
-        
-        # 最大長を30文字に制限
-        if len(safe_title) > 30:
-            safe_title = safe_title[:30]
-        
-        # ダウンロードフォルダのパスを取得
-        downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
-        
-        # ファイル名を作成（日付_題名.txt）
-        date_str = datetime.now().strftime("%Y%m%d")
-        filename = f"{date_str}_{safe_title}.txt"
-        filepath = os.path.join(downloads_path, filename)
-        
-        # ファイルパスの確認とデバッグ情報
-        st.info(f"保存先: {filepath}")
-        st.info(f"ファイル名: {filename}")
-        
-        # UTF-8でファイルを保存
-        with open(filepath, 'w', encoding='utf-8', newline='') as f:
-            f.write(story)
-            
-        return filepath
-        
-    except UnicodeEncodeError as e:
-        st.error(f"文字エンコーディングエラー: {str(e)}")
-        # フォールバック: ASCII安全な名前で保存
-        try:
-            fallback_title = f"story_{datetime.now().strftime('%H%M%S')}"
-            fallback_filename = f"{datetime.now().strftime('%Y%m%d')}_{fallback_title}.txt"
-            fallback_filepath = os.path.join(downloads_path, fallback_filename)
-            with open(fallback_filepath, 'w', encoding='utf-8', newline='') as f:
-                f.write(story)
-            st.warning(f"フォールバック保存: {fallback_filename}")
-            return fallback_filepath
-        except Exception as fallback_error:
-            st.error(f"フォールバック保存も失敗: {str(fallback_error)}")
-            return None
-    except Exception as e:
-        st.error(f"保存エラー: {str(e)}")
-        st.error(f"エラー詳細: {type(e).__name__}")
-        return None
+# 修正された保存機能：Streamlitのダウンロード機能を使用
+def create_download_button(story, title):
+    """Streamlitのダウンロード機能でファイル保存"""
+    # 安全なファイル名の作成
+    safe_title = ""
+    for char in title:
+        if char.isalnum() or char in "ーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽァィゥェォッャュョアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ一二三四五六七八九十百千万億兆":
+            safe_title += char
+        elif char in " 　":
+            safe_title += "_"
+    
+    # 空の場合はデフォルト名を使用
+    if not safe_title.strip():
+        safe_title = "generated_story"
+    
+    # 最大長を30文字に制限
+    if len(safe_title) > 30:
+        safe_title = safe_title[:30]
+    
+    # ファイル名を作成（日付_題名.txt）
+    date_str = datetime.now().strftime("%Y%m%d")
+    filename = f"{date_str}_{safe_title}.txt"
+    
+    # Streamlitのダウンロードボタンを作成
+    return st.download_button(
+        label="💾 物語をダウンロード",
+        data=story,
+        file_name=filename,
+        mime="text/plain",
+        use_container_width=True,
+        help=f"物語を '{filename}' としてダウンロード"
+    )
 
 def main():
     st.title("📚 古典融合ストーリーメーカー")
@@ -220,22 +191,23 @@ def main():
         )
         
         # 使用する物語要素数
-        max_elements = sum(len(elements) for elements in story_data.values())
+        total_elements = sum(len(elements) for elements in story_data.values())
         num_elements = st.number_input(
             "使用する物語要素の数",
             min_value=1,
-            max_value=min(10, max_elements),
+            max_value=min(10, total_elements),
             value=2,
             step=1
         )
         
         if debug_mode:
             st.subheader("📊 データ統計")
-            st.write(f"総要素数: {max_elements}")
+            total_elements = sum(len(elements) for elements in story_data.values())
+            st.write(f"総要素数: {total_elements}")
             for collection, elements in story_data.items():
                 st.write(f"- {collection}: {len(elements)}要素")
             
-            # 重複チェック
+            # 重複チェック（古い形式対応）
             all_element_names = []
             for collection_name, elements in story_data.items():
                 for element in elements:
@@ -305,6 +277,7 @@ def main():
         if 'selected_elements' in st.session_state:
             st.subheader("選択された要素:")
             for i, element in enumerate(st.session_state.selected_elements, 1):
+                # 古い形式のデータ構造
                 with st.expander(f"{i}. {element['collection']} - {element['story_name']}"):
                     st.write(f"**要素:** {element['element']}")
         
@@ -341,6 +314,15 @@ def main():
         if output_mode == "プロンプトのみ出力":
             if 'current_prompt' in st.session_state:
                 st.success("プロンプトが生成されました！左側のテキストエリアからコピーしてお使いください。")
+                
+                # プロンプトのダウンロードボタンも追加
+                st.download_button(
+                    label="📥 プロンプトをダウンロード",
+                    data=st.session_state.current_prompt,
+                    file_name=f"story_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
         
         # 本文生成の場合
         elif output_mode == "本文まで生成":
@@ -349,8 +331,6 @@ def main():
             elif 'current_prompt' in st.session_state:
                 if st.button("物語を生成", type="primary"):
                     # プロンプトの内容をデバッグ表示（本番では非表示にできます）
-                    debug_mode = st.checkbox("🐛 デバッグ情報を表示", value=False)
-                    
                     if debug_mode:
                         with st.expander("🐛 デバッグ情報（プロンプト内容確認）"):
                             st.text(f"プロンプトの長さ: {len(st.session_state.current_prompt)} 文字")
@@ -378,7 +358,7 @@ def main():
                     # 物語から題名を自動抽出
                     auto_title = extract_title_from_story(st.session_state.generated_story)
                     
-                    # 保存機能
+                    # 修正された保存機能
                     col_save1, col_save2 = st.columns([2, 1])
                     with col_save1:
                         # 自動抽出された題名をデフォルトに設定
@@ -388,12 +368,9 @@ def main():
                             help="物語の最初の行から自動抽出された題名です。編集可能です。"
                         )
                     with col_save2:
-                        if st.button("💾 保存"):
-                            filepath = save_story_to_file(st.session_state.generated_story, save_title)
-                            if filepath:
-                                st.success(f"物語を保存しました: {os.path.basename(filepath)}")
-                            else:
-                                st.error("保存に失敗しました。")
+                        # 修正：Streamlitのダウンロードボタンを使用
+                        if create_download_button(st.session_state.generated_story, save_title):
+                            st.success("ダウンロードが開始されました！")
     
     # フッター
     st.markdown("---")
