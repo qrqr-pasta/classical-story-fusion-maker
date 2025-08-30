@@ -53,7 +53,7 @@ def select_random_elements(story_data, num_elements):
 def create_prompt(selected_elements, word_count, custom_text=""):
     """生成AIに送るプロンプトを作成"""
     try:
-        prompt = f"以下の物語の要素を包含して、ストーリーを作ってください。文字数は{word_count}文字前後です。最後に、出展にした物語の古典名と概略を載せてください\n\n"
+        prompt = f"以下の物語の要素を包含して、ストーリーを作ってください。文字数は{word_count}文字前後です。最後に、出展にした物語の古典名と概略を載せてください。個人名や地名を引用しないくでください。主人公はキャッチ－で覚えやすい名前にしてください。\n\n"
         
         for i, element in enumerate(selected_elements, 1):
             # 古い形式のデータ構造
@@ -231,7 +231,7 @@ def main():
         # 自由入力
         custom_text = st.text_area(
             "自由入力（プロンプトに追加する指示）",
-            value="個人名や地名を引用しない。主人公は覚えやすい名前にする。",
+            value=" ",
             height=120
         )
         
@@ -385,4 +385,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
