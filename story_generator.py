@@ -21,6 +21,14 @@ st.set_page_config(
     layout="wide"
 )
 
+# カテゴリ分類の辞書
+CATEGORY_MAPPING = {
+    "古典神話・宗教": ["古事記", "聖書", "北欧神話", "ギリシャ神話", "エジプト神話", "メソポタミア神話", "ゲルマン神話", "ケルト"],
+    "民話・説話": ["アラブ系文学", "インド系文学", "イソップ", "グリム", "日本昔話", "アジア古典", "日本の古典文学"],
+    "古典・近世文学": ["世界演劇", "世界文学"],
+    "現代・都市伝説": ["近現代の映画・小説", "都市伝説・現代民話"]
+}
+
 def load_story_elements():
     """story_elements.jsonを読み込む"""
     try:
@@ -29,6 +37,25 @@ def load_story_elements():
     except FileNotFoundError:
         st.error("story_elements.jsonが見つかりません。先にデータ変換を実行してください。")
         return None
+
+def get_filtered_story_data(story_data, selected_categories):
+    """選択されたカテゴリのジャンルのみを含むデータを返す"""
+    if not selected_categories:
+        st.warning("少なくとも1つのカテゴリを選択してください。")
+        return {}
+    
+    # 選択されたカテゴリに含まれるジャンル名を取得
+    selected_genres = []
+    for category in selected_categories:
+        selected_genres.extend(CATEGORY_MAPPING[category])
+    
+    # フィルタリングされたデータを作成
+    filtered_data = {}
+    for genre_name, elements in story_data.items():
+        if genre_name in selected_genres:
+            filtered_data[genre_name] = elements
+    
+    return filtered_data
 
 def select_random_elements(story_data, num_elements):
     """ランダムに物語要素を選択する"""
@@ -43,6 +70,10 @@ def select_random_elements(story_data, num_elements):
                 'element': element['element']
             })
     
+    if not all_elements:
+        st.error("選択されたカテゴリに物語要素が見つかりません。")
+        return []
+    
     # ランダムに選択（真のランダムを保証）
     import time
     random.seed(time.time())  # 現在時刻をシードに使用
@@ -53,7 +84,7 @@ def select_random_elements(story_data, num_elements):
 def create_prompt(selected_elements, word_count, custom_text=""):
     """生成AIに送るプロンプトを作成"""
     try:
-        prompt = f"以下の物語の要素を包含して、ストーリーを作ってください。文字数は{word_count}文字前後です。出典から個人名や地名などの固有名詞を引用せず、キャッチ－で覚えやすい名前にしてください。最後に、古典名と内容を載せてください。\n\n"
+        prompt = f"以下の物語の要素を包含して、ストーリーを作ってください。文字数は{word_count}文字前後です。出典から個人名や地名などの固有名詞を引用せず、キャッチーで覚えやすい名前にしてください。最後に、古典名と内容を載せてください。\n\n"
         
         for i, element in enumerate(selected_elements, 1):
             # 古い形式のデータ構造
@@ -132,7 +163,6 @@ def extract_title_from_story(story):
     
     return title if title else "generated_story"
 
-# 修正された保存機能：Streamlitのダウンロード機能を使用
 def create_download_button(story, title):
     """Streamlitのダウンロード機能でファイル保存"""
     # 安全なファイル名の作成
@@ -178,6 +208,37 @@ def main():
     with st.sidebar:
         st.header("⚙️ 設定")
         
+        # カテゴリ選択
+        st.subheader("📚 使用するジャンル")
+        use_mythology = st.checkbox("古典神話・宗教", value=True, 
+                                   help="古事記、聖書、北欧神話、ギリシャ神話、エジプト神話、メソポタミア神話、ゲルマン神話、ケルト")
+        use_folktales = st.checkbox("民話・説話", value=True,
+                                   help="アラブ系文学、インド系文学、イソップ、グリム、日本昔話、アジア古典、日本の古典文学")
+        use_classical = st.checkbox("古典・近世文学", value=True,
+                                   help="世界演劇、世界文学")
+        use_modern = st.checkbox("現代・都市伝説", value=True,
+                                help="近現代の映画・小説、都市伝説・現代民話")
+        
+        # 選択されたカテゴリを取得
+        selected_categories = []
+        if use_mythology:
+            selected_categories.append("古典神話・宗教")
+        if use_folktales:
+            selected_categories.append("民話・説話")
+        if use_classical:
+            selected_categories.append("古典・近世文学")
+        if use_modern:
+            selected_categories.append("現代・都市伝説")
+        
+        # フィルタリングされたデータを取得
+        filtered_story_data = get_filtered_story_data(story_data, selected_categories)
+        
+        if not filtered_story_data:
+            st.warning("少なくとも1つのカテゴリを選択してください。")
+            st.stop()
+        
+        st.divider()
+        
         # デバッグモード（開発用）
         debug_mode = st.checkbox("🔍 デバッグモード", value=False)
         
@@ -191,7 +252,7 @@ def main():
         )
         
         # 使用する物語要素数
-        total_elements = sum(len(elements) for elements in story_data.values())
+        total_elements = sum(len(elements) for elements in filtered_story_data.values())
         num_elements = st.number_input(
             "使用する物語要素の数",
             min_value=1,
@@ -202,36 +263,18 @@ def main():
         
         if debug_mode:
             st.subheader("📊 データ統計")
-            total_elements = sum(len(elements) for elements in story_data.values())
             st.write(f"総要素数: {total_elements}")
-            for collection, elements in story_data.items():
+            st.write("選択されたカテゴリ:")
+            for category in selected_categories:
+                st.write(f"- {category}")
+            st.write("含まれるジャンル:")
+            for collection, elements in filtered_story_data.items():
                 st.write(f"- {collection}: {len(elements)}要素")
-            
-            # 重複チェック（古い形式対応）
-            all_element_names = []
-            for collection_name, elements in story_data.items():
-                for element in elements:
-                    full_name = f"{collection_name} - {element['story_name']}"
-                    all_element_names.append(full_name)
-            
-            duplicates = []
-            seen = set()
-            for name in all_element_names:
-                if name in seen:
-                    duplicates.append(name)
-                seen.add(name)
-            
-            if duplicates:
-                st.warning(f"重複要素が{len(duplicates)}個見つかりました:")
-                for dup in duplicates:
-                    st.write(f"- {dup}")
-            else:
-                st.success("重複要素はありません")
         
         # 自由入力
         custom_text = st.text_area(
             "自由入力（プロンプトに追加する指示）",
-            value=" ",
+            value="",
             height=120
         )
         
@@ -257,21 +300,22 @@ def main():
         st.header("🎲 物語要素選択")
         
         if st.button("要素をランダム選択", type="primary"):
-            selected_elements = select_random_elements(story_data, num_elements)
-            st.session_state.selected_elements = selected_elements
-            
-            # 選択履歴を記録（デバッグ用）
-            if 'selection_history' not in st.session_state:
-                st.session_state.selection_history = []
-            
-            # 各要素の名前を履歴に追加
-            for element in selected_elements:
-                element_name = f"{element['collection']} - {element['story_name']}"
-                st.session_state.selection_history.append(element_name)
-            
-            # 履歴が長くなりすぎないように制限
-            if len(st.session_state.selection_history) > 100:
-                st.session_state.selection_history = st.session_state.selection_history[-100:]
+            selected_elements = select_random_elements(filtered_story_data, num_elements)
+            if selected_elements:
+                st.session_state.selected_elements = selected_elements
+                
+                # 選択履歴を記録（デバッグ用）
+                if 'selection_history' not in st.session_state:
+                    st.session_state.selection_history = []
+                
+                # 各要素の名前を履歴に追加
+                for element in selected_elements:
+                    element_name = f"{element['collection']} - {element['story_name']}"
+                    st.session_state.selection_history.append(element_name)
+                
+                # 履歴が長くなりすぎないように制限
+                if len(st.session_state.selection_history) > 100:
+                    st.session_state.selection_history = st.session_state.selection_history[-100:]
         
         # 選択された要素を表示
         if 'selected_elements' in st.session_state:
@@ -376,21 +420,13 @@ def main():
     st.markdown("---")
     st.markdown("**使用方法:**")
     st.markdown("""
-    1. サイドバーで文字数、要素数、追加指示を設定
-    2. 「要素をランダム選択」ボタンをクリック
-    3. プロンプトのみ必要な場合は、生成されたプロンプトをコピー
-    4. 物語まで生成する場合は、API Keyを入力して「物語を生成」をクリック
-    5. 気に入った物語は保存ボタンで保存可能
+    1. サイドバーで使用するジャンルカテゴリを選択
+    2. 文字数、要素数、追加指示を設定
+    3. 「要素をランダム選択」ボタンをクリック
+    4. プロンプトのみ必要な場合は、生成されたプロンプトをコピー
+    5. 物語まで生成する場合は、API Keyを入力して「物語を生成」をクリック
+    6. 気に入った物語は保存ボタンで保存可能
     """)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
