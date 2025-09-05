@@ -228,7 +228,7 @@ def main():
     num_elements = st.sidebar.number_input("🎯 物語要素数", min_value=1, max_value=10, value=3, step=1)
     
     # 文字数の選択
-    word_count = st.sidebar.number_input("📝 文字数", min_value=100, max_value=5000, value=1000, step=50)
+    word_count = st.sidebar.number_input("📝 文字数", min_value=100, max_value=5000, value=600, step=100)
     
     # API Key入力（ストーリー全文生成モードの時のみ表示）
     if generation_mode == "ストーリー全文生成":
@@ -331,3 +331,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
