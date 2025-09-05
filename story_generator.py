@@ -165,7 +165,7 @@ def extract_title_from_story(story):
     
     return title if title else "generated_story"
 
-def create_download_button(story, title):
+def create_download_button(content, title, is_prompt=False):
     """Streamlitのダウンロード機能でファイル保存"""
     # 安全なファイル名の作成
     safe_title = ""
@@ -179,16 +179,18 @@ def create_download_button(story, title):
     
     # 空文字列の場合のデフォルト値
     if not safe_title.strip():
-        safe_title = "generated_story"
+        safe_title = "generated_content"
     
     # タイムスタンプを追加してファイル名の重複を防ぐ
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{safe_title}_{timestamp}.txt"
+    prefix = "prompt" if is_prompt else "story"
+    filename = f"{prefix}_{safe_title}_{timestamp}.txt"
     
     # ダウンロードボタンを作成
+    label = "📥 プロンプトをダウンロード" if is_prompt else "📥 ストーリーをダウンロード"
     st.download_button(
-        label="📥 ストーリーをダウンロード",
-        data=story.encode('utf-8'),
+        label=label,
+        data=content.encode('utf-8'),
         file_name=filename,
         mime="text/plain"
     )
@@ -206,6 +208,14 @@ def main():
     # サイドバーでの設定
     st.sidebar.header("⚙️ ストーリー設定")
     
+    # モード選択を追加
+    st.sidebar.subheader("🔧 生成モード")
+    generation_mode = st.sidebar.radio(
+        "生成方式を選択",
+        ["プロンプトのみ出力", "ストーリー全文生成"],
+        help="プロンプトのみ：他のAIツールで使用可能なプロンプトを生成\nストーリー全文生成：Claude APIでストーリーを生成"
+    )
+    
     # カテゴリ選択
     st.sidebar.subheader("📖 カテゴリ選択")
     selected_categories = []
@@ -219,9 +229,12 @@ def main():
     # 文字数の選択
     word_count = st.sidebar.number_input("📝 文字数", min_value=100, max_value=5000, value=1000, step=50)
     
-    # API Key入力
-    st.sidebar.subheader("🔑 API設定")
-    api_key = st.sidebar.text_input("Claude API Key", type="password", help="Anthropic Claude APIキーを入力してください")
+    # API Key入力（ストーリー全文生成モードの時のみ表示）
+    if generation_mode == "ストーリー全文生成":
+        st.sidebar.subheader("🔑 API設定")
+        api_key = st.sidebar.text_input("Claude API Key", type="password", help="Anthropic Claude APIキーを入力してください")
+    else:
+        api_key = None
     
     # カスタム指示
     st.sidebar.subheader("✨ カスタム指示")
@@ -255,37 +268,64 @@ def main():
             st.warning("選択されたカテゴリに該当するデータがありません。")
     
     with col2:
-        st.header("📖 ストーリー生成")
-        
-        if st.button("✍️ ストーリーを生成", type="primary"):
-            if not api_key:
-                st.error("Claude API Keyを入力してください。")
-            elif 'selected_elements' not in st.session_state or not st.session_state.selected_elements:
-                st.error("物語要素を選択してください。")
-            else:
-                with st.spinner("ストーリーを生成中..."):
+        if generation_mode == "プロンプトのみ出力":
+            st.header("📝 プロンプト生成")
+            
+            if st.button("📝 プロンプトを生成", type="primary"):
+                if 'selected_elements' not in st.session_state or not st.session_state.selected_elements:
+                    st.error("物語要素を選択してください。")
+                else:
                     # プロンプト作成
                     prompt = create_prompt(st.session_state.selected_elements, word_count, custom_text)
                     
-                    # ストーリー生成
-                    story = generate_story_with_claude(prompt, api_key)
-                    
                     # セッションステートに保存
-                    st.session_state.generated_story = story
-        
-        # 生成されたストーリーを表示
-        if 'generated_story' in st.session_state:
-            st.subheader("生成されたストーリー:")
-            st.write(st.session_state.generated_story)
+                    st.session_state.generated_prompt = prompt
             
-            # ダウンロードボタン
-            title = extract_title_from_story(st.session_state.generated_story)
-            create_download_button(st.session_state.generated_story, title)
+            # 生成されたプロンプトを表示
+            if 'generated_prompt' in st.session_state:
+                st.subheader("生成されたプロンプト:")
+                st.code(st.session_state.generated_prompt, language="text")
+                
+                # コピー用のテキストエリア
+                st.text_area("コピー用", st.session_state.generated_prompt, height=200, key="prompt_copy")
+                
+                # ダウンロードボタン
+                create_download_button(st.session_state.generated_prompt, "prompt", is_prompt=True)
+                
+                st.info("💡 このプロンプトを他のAIツール（ChatGPT、Claude、Gemini等）にコピー&ペーストして使用できます。")
+        
+        else:  # ストーリー全文生成モード
+            st.header("📖 ストーリー生成")
+            
+            if st.button("✍️ ストーリーを生成", type="primary"):
+                if not api_key:
+                    st.error("Claude API Keyを入力してください。")
+                elif 'selected_elements' not in st.session_state or not st.session_state.selected_elements:
+                    st.error("物語要素を選択してください。")
+                else:
+                    with st.spinner("ストーリーを生成中..."):
+                        # プロンプト作成
+                        prompt = create_prompt(st.session_state.selected_elements, word_count, custom_text)
+                        
+                        # ストーリー生成
+                        story = generate_story_with_claude(prompt, api_key)
+                        
+                        # セッションステートに保存
+                        st.session_state.generated_story = story
+            
+            # 生成されたストーリーを表示
+            if 'generated_story' in st.session_state:
+                st.subheader("生成されたストーリー:")
+                st.write(st.session_state.generated_story)
+                
+                # ダウンロードボタン
+                title = extract_title_from_story(st.session_state.generated_story)
+                create_download_button(st.session_state.generated_story, title)
     
     # フッター
     st.markdown("---")
     st.markdown(
-        "💡 **使い方**: カテゴリを選択 → 要素数と文字数を設定 → 生成モードを選択 → 生成実行"
+        "💡 **使い方**: 生成モードを選択 → カテゴリを選択 → 要素数と文字数を設定 → 生成実行"
     )
 
 if __name__ == "__main__":
