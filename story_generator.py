@@ -214,10 +214,10 @@ def main():
             selected_categories.append(category)
     
     # 物語要素数の選択
-    num_elements = st.sidebar.slider("🎯 物語要素数", min_value=2, max_value=8, value=3)
+    num_elements = st.sidebar.number_input("🎯 物語要素数", min_value=1, max_value=10, value=3, step=1)
     
     # 文字数の選択
-    word_count = st.sidebar.slider("📝 文字数", min_value=500, max_value=3000, value=1000, step=100)
+    word_count = st.sidebar.number_input("📝 文字数", min_value=100, max_value=5000, value=1000, step=50)
     
     # API Key入力
     st.sidebar.subheader("🔑 API設定")
