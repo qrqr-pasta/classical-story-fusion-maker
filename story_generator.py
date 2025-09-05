@@ -169,5 +169,124 @@ def create_download_button(story, title):
     """Streamlitのダウンロード機能でファイル保存"""
     # 安全なファイル名の作成
     safe_title = ""
+    japanese_chars = "ーあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ"
+    
     for char in title:
-        if char.isalnum() or char in "ーあいうえおかきくけこさしすせそたちつてとなにぬねの
+        if char.isalnum() or char in japanese_chars or char in " _-":
+            safe_title += char
+        else:
+            safe_title += "_"
+    
+    # 空文字列の場合のデフォルト値
+    if not safe_title.strip():
+        safe_title = "generated_story"
+    
+    # タイムスタンプを追加してファイル名の重複を防ぐ
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{safe_title}_{timestamp}.txt"
+    
+    # ダウンロードボタンを作成
+    st.download_button(
+        label="📥 ストーリーをダウンロード",
+        data=story.encode('utf-8'),
+        file_name=filename,
+        mime="text/plain"
+    )
+
+def main():
+    """メイン関数"""
+    st.title("📚 古典融合ストーリーメーカー")
+    st.markdown("---")
+    
+    # データ読み込み
+    story_data = load_story_elements()
+    if story_data is None:
+        return
+    
+    # サイドバーでの設定
+    st.sidebar.header("⚙️ ストーリー設定")
+    
+    # カテゴリ選択
+    st.sidebar.subheader("📖 カテゴリ選択")
+    selected_categories = []
+    for category in CATEGORY_MAPPING.keys():
+        if st.sidebar.checkbox(category, value=True):
+            selected_categories.append(category)
+    
+    # 物語要素数の選択
+    num_elements = st.sidebar.slider("🎯 物語要素数", min_value=2, max_value=8, value=3)
+    
+    # 文字数の選択
+    word_count = st.sidebar.slider("📝 文字数", min_value=500, max_value=3000, value=1000, step=100)
+    
+    # API Key入力
+    st.sidebar.subheader("🔑 API設定")
+    api_key = st.sidebar.text_input("Claude API Key", type="password", help="Anthropic Claude APIキーを入力してください")
+    
+    # カスタム指示
+    st.sidebar.subheader("✨ カスタム指示")
+    custom_text = st.sidebar.text_area("追加の指示があれば入力してください", height=100)
+    
+    # メインエリア
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.header("🎲 物語要素選択")
+        
+        if st.button("🔄 要素を再選択", type="primary"):
+            # セッションステートをクリアして新しい要素を選択
+            if 'selected_elements' in st.session_state:
+                del st.session_state['selected_elements']
+        
+        # フィルタリングされたデータを取得
+        filtered_data = get_filtered_story_data(story_data, selected_categories)
+        
+        if filtered_data:
+            # 選択された要素をセッションステートで保持
+            if 'selected_elements' not in st.session_state:
+                st.session_state.selected_elements = select_random_elements(filtered_data, num_elements)
+            
+            if st.session_state.selected_elements:
+                st.subheader("選択された物語要素:")
+                for i, element in enumerate(st.session_state.selected_elements, 1):
+                    with st.expander(f"{i}. {element['collection']} - {element['story_name']}"):
+                        st.write(element['element'])
+        else:
+            st.warning("選択されたカテゴリに該当するデータがありません。")
+    
+    with col2:
+        st.header("📖 ストーリー生成")
+        
+        if st.button("✍️ ストーリーを生成", type="primary"):
+            if not api_key:
+                st.error("Claude API Keyを入力してください。")
+            elif 'selected_elements' not in st.session_state or not st.session_state.selected_elements:
+                st.error("物語要素を選択してください。")
+            else:
+                with st.spinner("ストーリーを生成中..."):
+                    # プロンプト作成
+                    prompt = create_prompt(st.session_state.selected_elements, word_count, custom_text)
+                    
+                    # ストーリー生成
+                    story = generate_story_with_claude(prompt, api_key)
+                    
+                    # セッションステートに保存
+                    st.session_state.generated_story = story
+        
+        # 生成されたストーリーを表示
+        if 'generated_story' in st.session_state:
+            st.subheader("生成されたストーリー:")
+            st.write(st.session_state.generated_story)
+            
+            # ダウンロードボタン
+            title = extract_title_from_story(st.session_state.generated_story)
+            create_download_button(st.session_state.generated_story, title)
+    
+    # フッター
+    st.markdown("---")
+    st.markdown(
+        "💡 **使い方**: カテゴリを選択 → 要素数と文字数を設定 → API Keyを入力 → ストーリーを生成"
+    )
+
+if __name__ == "__main__":
+    main()
