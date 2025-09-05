@@ -211,29 +211,33 @@ def main():
         
         # カテゴリ選択
         st.subheader("📚 使用するジャンル")
-        use_japanese_myth = st.checkbox("日本の神話", value=True, 
-                                       help="古事記、日本昔話、日本の古典文学")
-        use_world_myth = st.checkbox("世界の神話", value=True,
+        use_japanese = st.checkbox("日本", value=True, 
+                                  help="古事記、日本昔話、日本の古典文学")
+        use_world_myth = st.checkbox("世界神話", value=True,
                                     help="聖書、北欧神話、ギリシャ神話、エジプト神話、メソポタミア神話、ゲルマン神話、アラブ系文学、インド系文学、ケルト、アジア古典")
-        use_folktales = st.checkbox("昔話", value=True,
-                                   help="イソップ、グリム")
-        use_drama = st.checkbox("演劇", value=True,
-                               help="世界演劇、世界文学")
-        use_entertainment = st.checkbox("エンタメ", value=True,
-                                       help="映画、都市伝説、ラノベ")
+        use_world_literature = st.checkbox("世界文学", value=True,
+                                          help="イソップ、グリム、世界演劇、世界文学")
+        use_movies = st.checkbox("映画", value=True,
+                                help="映画")
+        use_urban_legends = st.checkbox("都市伝説", value=True,
+                                       help="都市伝説")
+        use_light_novels = st.checkbox("ラノベ", value=True,
+                                      help="ラノベ")
         
         # 選択されたカテゴリを取得
         selected_categories = []
-        if use_japanese_myth:
-            selected_categories.append("日本の神話")
+        if use_japanese:
+            selected_categories.append("日本")
         if use_world_myth:
-            selected_categories.append("世界の神話")
-        if use_folktales:
-            selected_categories.append("昔話")
-        if use_drama:
-            selected_categories.append("演劇")
-        if use_entertainment:
-            selected_categories.append("エンタメ")
+            selected_categories.append("世界神話")
+        if use_world_literature:
+            selected_categories.append("世界文学")
+        if use_movies:
+            selected_categories.append("映画")
+        if use_urban_legends:
+            selected_categories.append("都市伝説")
+        if use_light_novels:
+            selected_categories.append("ラノベ")
         
         # フィルタリングされたデータを取得
         filtered_story_data = get_filtered_story_data(story_data, selected_categories)
